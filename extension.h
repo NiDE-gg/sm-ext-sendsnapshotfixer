@@ -45,8 +45,7 @@
  */
 class SSF :
 	public SDKExtension,
-	public IConCommandBaseAccessor,
-	public IClientListener
+	public IConCommandBaseAccessor
 {
 public:
 	/**
