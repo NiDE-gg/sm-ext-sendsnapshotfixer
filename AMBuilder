@@ -1,0 +1,20 @@
+# vim: set sts=2 ts=8 sw=2 tw=99 et ft=python:
+import os
+
+if not "SM" in globals():
+	SM = Extension
+
+projectName = 'sendsnapshotfixer'
+
+project = SM.HL2Project(builder, projectName + '.ext')
+project.sources += [
+  'ssf.cpp',
+]
+project.compiler.defines += ['HAVE_STRING_H'];
+
+for sdk_name in SM.sdks:
+  sdk = SM.sdks[sdk_name]
+
+  binary = SM.HL2Config(project, projectName + '_mm_i486', sdk)
+
+SM.extensions += builder.Add(project)
