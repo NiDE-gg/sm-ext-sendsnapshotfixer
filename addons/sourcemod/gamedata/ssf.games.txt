@@ -1,0 +1,20 @@
+"Games"
+{
+	"#default"
+	{
+		"#supported"
+		{
+			"engine"	"orangebox_valve"
+			"engine"	"css"
+		}
+
+		"Signatures"
+		{
+			"CBaseClient__SendSnapshot"
+			{
+				"library"		"engine"
+				"linux"			"@_ZN11CBaseClient12SendSnapshotEP12CClientFrame"
+			}
+		}
+	}
+}

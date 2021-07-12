@@ -8,13 +8,22 @@ projectName = 'sendsnapshotfixer'
 
 project = SM.HL2Project(builder, projectName + '.ext')
 project.sources += [
-  'ssf.cpp',
+  'extension.cpp',
+#  os.path.join(Extension.sm_root, 'extensions', 'common', 'mathstubs.c'),
+  os.path.join(Extension.sm_root, 'public', 'smsdk_ext.cpp'),
+  os.path.join(Extension.sm_root, 'public', 'CDetour', 'detours.cpp'),
+  os.path.join(Extension.sm_root, 'public', 'asm', 'asm.c'),
+  os.path.join(Extension.sm_root, 'public', 'libudis86', 'decode.c'),
+  os.path.join(Extension.sm_root, 'public', 'libudis86', 'itab.c'),
+  os.path.join(Extension.sm_root, 'public', 'libudis86', 'syn-att.c'),
+  os.path.join(Extension.sm_root, 'public', 'libudis86', 'syn-intel.c'),
+  os.path.join(Extension.sm_root, 'public', 'libudis86', 'syn.c'),
+  os.path.join(Extension.sm_root, 'public', 'libudis86', 'udis86.c'),
 ]
-project.compiler.defines += ['HAVE_STRING_H'];
 
 for sdk_name in SM.sdks:
   sdk = SM.sdks[sdk_name]
 
-  binary = SM.HL2Config(project, projectName + '_mm_i486', sdk)
+  binary = SM.HL2Config(project, projectName + '.ext.' + sdk.ext, sdk)
 
 SM.extensions += builder.Add(project)

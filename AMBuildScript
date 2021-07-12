@@ -151,9 +151,9 @@ class ExtensionConfig(object):
     elif builder.target_platform == 'windows':
       self.configure_windows(cxx)
 
-    # Finish up.	
-    cxx.includes += [	
-      os.path.join(self.sm_root, 'public'),	
+    # Finish up.
+    cxx.includes += [
+      os.path.join(self.sm_root, 'public'),
     ]
 
   def configure_gcc(self, cxx):
@@ -167,10 +167,9 @@ class ExtensionConfig(object):
     ]
     cxx.cflags += [
       '-pipe',
-      '-fPIC',
       '-fno-strict-aliasing',
       '-Wall',
-      '-Werror',
+#      '-Werror',
       '-Wno-unused',
       '-Wno-switch',
       '-Wno-array-bounds',
@@ -184,9 +183,7 @@ class ExtensionConfig(object):
       '-fno-threadsafe-statics',
       '-Wno-non-virtual-dtor',
       '-Wno-overloaded-virtual',
-      '-fno-rtti',
       '-fvisibility-inlines-hidden',
-      '-fpermissive',
     ]
     cxx.linkflags += ['-m32']
 
@@ -213,10 +210,7 @@ class ExtensionConfig(object):
       cxx.cflags += ['-mfpmath=sse']
 
     if builder.options.opt == '1':
-      cxx.cflags += [
-        '-O3',
-        '-funroll-loops',
-      ]
+      cxx.cflags += ['-O3']
 
   def configure_msvc(self, cxx):
     if builder.options.debug == '1':
@@ -267,12 +261,11 @@ class ExtensionConfig(object):
 
   def configure_linux(self, cxx):
     cxx.defines += ['_LINUX', 'POSIX']
-    cxx.linkflags += ['-lm', '-ldl']
+    cxx.linkflags += ['-Wl,--exclude-libs,ALL', '-lm']
     if cxx.vendor == 'gcc':
       cxx.linkflags += ['-static-libgcc']
     elif cxx.vendor == 'clang':
       cxx.linkflags += ['-lgcc_eh']
-    cxx.linkflags += ['-static-libstdc++']
 
   def configure_mac(self, cxx):
     cxx.defines += ['OSX', '_OSX', 'POSIX']
@@ -283,6 +276,7 @@ class ExtensionConfig(object):
       '-lstdc++',
       '-stdlib=libstdc++',
     ]
+    cxx.cxxflags += ['-stdlib=libstdc++']
 
   def configure_windows(self, cxx):
     cxx.defines += ['WIN32', '_WINDOWS']
@@ -290,6 +284,7 @@ class ExtensionConfig(object):
   def ConfigureForExtension(self, context, compiler):
     compiler.cxxincludes += [
       os.path.join(context.currentSourcePath),
+      os.path.join(context.currentSourcePath, 'sdk'),
       os.path.join(self.sm_root, 'public'),
       os.path.join(self.sm_root, 'public', 'extensions'),
       os.path.join(self.sm_root, 'sourcepawn', 'include'),

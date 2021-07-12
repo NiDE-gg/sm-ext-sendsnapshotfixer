@@ -1,5 +1,0 @@
-"Metamod Plugin"
-{
-	"alias"		"sendsnapshotfixer"
-	"file"		"addons/sendsnapshotfixer/bin/sendsnapshotfixer_mm"
-}

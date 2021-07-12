@@ -7,8 +7,8 @@ builder.SetBuildFolder('package')
 
 # Add any folders you need to this list
 folder_list = [
-  'addons/metamod',
-  'addons/sendsnapshotfixer/bin',
+  'addons/sourcemod/extensions',
+  'addons/sourcemod/gamedata',
 ]
 
 # Create the distribution folder hierarchy.
@@ -26,11 +26,11 @@ def CopyFiles(src, dest, files):
     source_path = os.path.join(builder.sourcePath, src, source_file)
     builder.AddCopy(source_path, dest_entry)
 
-# Metamod VDF
-CopyFiles('addons/metamod', 'addons/metamod',
-  [ 'sendsnapshotfixer.vdf' ]
+# GameData
+CopyFiles('addons/sourcemod/gamedata', 'addons/sourcemod/gamedata',
+  [ 'ssf.games.txt' ]
 )
 
 # Copy binaries.
 for cxx_task in Extension.extensions:
-  builder.AddCopy(cxx_task.binary, folder_map['addons/sendsnapshotfixer/bin'])
+  builder.AddCopy(cxx_task.binary, folder_map['addons/sourcemod/extensions'])
