@@ -34,179 +34,16 @@
 #include "CDetour/detours.h"
 #include <sourcehook.h>
 #include <iclient.h>
+#include <iserver.h>
 #include <igameevents.h>
 #include <iplayerinfo.h>
-#include <smartptr.h>
-#include <platform.h>
-#include <inetchannel.h>
-#include <vprof.h>
-#include <soundinfo.h>
 
-// // Custom
-// #include <netmessages.h>
-
-#define	NET_MAX_PAYLOAD				288000	// largest message we can send in bytes
-
-class SVC_Sounds
-{
-public:
-	virtual void	SetReliable( bool state);
-	virtual	bool	WriteToBuffer( bf_write &buffer ) ;	// returns true if writing was OK
-public:
-
-	bool		m_bReliableSound;
-	int			m_nNumSounds;
-	int			m_nLength;
-	bf_read		m_DataIn;
-	bf_write	m_DataOut;
-};
-
-extern ConVar sv_netspike_on_reliable_snapshot_overflow;
-
-extern  float		host_frametime_unbounded;
-extern  float		host_frametime_stddeviation;
-
-class NET_Tick
-{
-public:
-	NET_Tick( int tick, float hostFrametime, float hostFrametime_stddeviation ) 
-	{
-	}
-public:
-	bool WriteToBuffer( bf_write &buffer );
-};
-
-class CLocalNetworkBackdoor;
-
-// The client will set this if it decides to use the fast path.
-extern CLocalNetworkBackdoor *g_pLocalNetworkBackdoor;
-
-#define TRACE_PACKET( text )
-#define tmZoneFiltered(...)
-#define TMZF_NONE	0x0000
-
-typedef char *HTELEMETRY;
-
-struct TelemetryData
-{
-	HTELEMETRY tmContext[32];
-};
-
-PLATFORM_INTERFACE TelemetryData g_Telemetry;
-
-#define TELEMETRY_LEVEL0	g_Telemetry.tmContext[0]	// high level tmZone()
-#define TELEMETRY_LEVEL1	g_Telemetry.tmContext[1]	// lower level tmZone(), tmZoneFiltered()
-#define TELEMETRY_LEVEL2	g_Telemetry.tmContext[2]	// VPROF_0
-#define TELEMETRY_LEVEL3	g_Telemetry.tmContext[3]	// VPROF_1
-#define TELEMETRY_LEVEL4	g_Telemetry.tmContext[4]	// VPROF_2
-#define TELEMETRY_LEVEL5	g_Telemetry.tmContext[5]	// VPROF_3
-#define TELEMETRY_LEVEL6	g_Telemetry.tmContext[6]	// VPROF_4
-
-class CFrameSnapshot
-{
-public:
-	void					AddReference();
-	void					ReleaseReference();
-};
-
-class CClientFrame
-{
-public:
-	CFrameSnapshot*		GetSnapshot();
-public:
-	int					tick_count;	// server tick of this snapshot
-private:
-
-	// Index of snapshot entry that stores the entities that were active and the serial numbers
-	// for the frame number this packed entity corresponds to
-	// m_pSnapshot MUST be private to force using SetSnapshot(), see reference counters
-	CFrameSnapshot		*m_pSnapshot;
-};
-
-class CBaseServer;
+class CFrameSnapshot;
+class CClientFrame;
 
 class CBaseClient : public IGameEventListener2, public IClient
 {
-public:
-	bool			IsTracing();
-	void			TraceNetworkData( bf_write &msg, PRINTF_FORMAT_STRING char const *fmt, ... );
-	void			TraceNetworkMsg( int nBits, PRINTF_FORMAT_STRING char const *fmt, ... );
 
-	virtual CClientFrame *GetDeltaFrame( int nTick );
-	virtual void	WriteGameSounds(bf_write &buf);
-
-public:
-
-	void			OnRequestFullUpdate();
-
-public:
-
-	// Array index in svs.clients:
-	int				m_nClientSlot;	
-	// entity index of this client (different from clientSlot+1 in HLTV and Replay mode):
-	int				m_nEntityIndex;	
-	
-	CBaseServer		*m_Server;			// pointer to server object
-	bool			m_bIsHLTV;			// if this a HLTV proxy ?
-
-	bool			m_bIsReplay;		// if this is a Replay proxy ?
-
-	//===== NETWORK ============
-	INetChannel		*m_NetChannel;		// The client's net connection.
-	int				m_nSignonState;		// connection state
-	int				m_nDeltaTick;		// -1 = no compression.  This is where the server is creating the
-										// compressed info from.
-	int				m_nStringTableAckTick; // Highest tick acked for string tables (usually m_nDeltaTick, except when it's -1)
-	int				m_nSignonTick;		// tick the client got his signon data
-	CSmartPtr<CFrameSnapshot,CRefCountAccessorLongName> m_pLastSnapshot;	// last send snapshot
-
-		
-	// This is used when we send out a nodelta packet to put the client in a state where we wait 
-	// until we get an ack from them on this packet.
-	// This is for 3 reasons:
-	// 1. A client requesting a nodelta packet means they're screwed so no point in deluging them with data.
-	//    Better to send the uncompressed data at a slow rate until we hear back from them (if at all).
-	// 2. Since the nodelta packet deletes all client entities, we can't ever delta from a packet previous to it.
-	// 3. It can eat up a lot of CPU on the server to keep building nodelta packets while waiting for
-	//    a client to get back on its feet.
-	int				m_nForceWaitForTick;
-	
-	bool			m_bFakePlayer;		// JAC: This client is a fake player controlled by the game DLL
-
-	enum
-	{
-		SNAPSHOT_SCRATCH_BUFFER_SIZE = 160000,
-	};
-
-	unsigned int		m_SnapshotScratchBuffer[ SNAPSHOT_SCRATCH_BUFFER_SIZE / 4 ];
-
-public:
-	void				StartTrace( bf_write &msg );
-	void				EndTrace( bf_write &msg );
-
-	int					m_iTracing; // 0 = not active, 1 = active for this frame, 2 = forced active
-};
-
-class CNetworkStringTableContainer
-{
-public:
-	void		WriteUpdateMessage( CBaseClient *client, int tick_ack, bf_write &buf );
-};
-
-class CBaseServer
-{
-public:
-	virtual void	WriteDeltaEntities( CBaseClient *client, CClientFrame *to, CClientFrame *from,	bf_write &pBuf );
-	virtual void	WriteTempEntities( CBaseClient *client, CFrameSnapshot *to, CFrameSnapshot *from, bf_write &pBuf, int nMaxEnts );	
-	virtual bool	IsMultiplayer( void );
-public:
-	CNetworkStringTableContainer *m_StringTables;
-};
-
-class CGameClient: public CBaseClient
-{
-public:
-	CUtlVector<SoundInfo_t>	m_Sounds;			// game sounds
 };
 
 SSF g_SSF;		/**< Global singleton for extension's main interface */
@@ -217,258 +54,46 @@ IGameConfig *g_pGameConf = NULL;
 CGlobalVars *gpGlobals = NULL;
 
 CDetour *g_Detour_CBaseClient__SendSnapshot = NULL;
+CDetour *g_Detour_CBaseServer__WriteTempEntities = NULL;
 
 ConVar *g_SvSSFLog = CreateConVar("sv_ssf_log", "0", FCVAR_NOTIFY, "Log ssf debug print statements.");
 ConVar *g_sv_multiplayer_maxtempentities = CreateConVar("sv_multiplayer_maxtempentities", "32");
-ConVar *g_sv_multiplayer_maxsounds = CreateConVar("sv_multiplayer_sounds", "20");
-ConVar *g_sv_sound_discardextraunreliable = CreateConVar( "sv_sound_discardextraunreliable", "1" );
 
-int Custom_CGameClient_FillSoundsMessage(CGameClient *pGameClient, SVC_Sounds &msg, int nMaxSounds)
+// ConVar *g_sv_multiplayer_maxsounds = CreateConVar("sv_multiplayer_sounds", "20");
+// ConVar *g_sv_sound_discardextraunreliable = CreateConVar( "sv_sound_discardextraunreliable", "1" );
+
+DETOUR_DECL_MEMBER5(CBaseServer__WriteTempEntities, void, CBaseClient *, client, CFrameSnapshot *, pCurrentSnapshot, CFrameSnapshot *, pLastSnapshot, bf_write, &buf, int, ev_max)
 {
-	int i, count = pGameClient->m_Sounds.Count();
-
-	// Discard events if we have too many to signal with 8 bits
-	if ( count > nMaxSounds )
-		count = nMaxSounds;
-
-	// Nothing to send
-	if ( !count )
-		return 0;
-
-	SoundInfo_t defaultSound;
-	SoundInfo_t *pDeltaSound = &defaultSound;
-	
-	msg.m_nNumSounds = count;
-	msg.m_bReliableSound = false;
-
-	Assert( msg.m_DataOut.GetNumBitsLeft() > 0 );
-
-	for ( i = 0 ; i < count; i++ )
+	if (!client->IsHLTV() && !client->IsReplay())
 	{
-		SoundInfo_t &sound = pGameClient->m_Sounds[ i ];
-		sound.WriteDelta( pDeltaSound, msg.m_DataOut );
-		pDeltaSound = &pGameClient->m_Sounds[ i ];
-	}
-
-	// remove added events from list
-	if ( g_sv_sound_discardextraunreliable->GetBool() )
-	{
-		if ( pGameClient->m_Sounds.Count() != count )
+		if (g_SvSSFLog->GetBool())
 		{
-			DevMsg( 2, "Warning! Dropped %i unreliable sounds for client %s.\n" , pGameClient->m_Sounds.Count() - count, pGameClient->GetClientName() );
-		}
-		pGameClient->m_Sounds.RemoveAll();
-	}
-	else
-	{
-		int remove = pGameClient->m_Sounds.Count() - ( count + nMaxSounds );
-		if ( remove > 0 )
-		{
-			DevMsg( 2, "Warning! Dropped %i unreliable sounds for client %s.\n" , remove, pGameClient->GetClientName() );
-			count+= remove;
+			g_pSM->LogMessage(myself, "SSF:CBaseServer__WriteTempEntities maxentities before: %d", ev_max);
 		}
 
-		if ( count > 0 )
+		// send all unreliable temp entities between last and current frame
+		// send max 64 events in multi player, 255 in SP
+		ev_max = client->GetServer()->IsMultiplayer() ? g_sv_multiplayer_maxtempentities->GetInt() : 255;
+
+		if (g_SvSSFLog->GetBool())
 		{
-			pGameClient->m_Sounds.RemoveMultiple( 0, count );
+			g_pSM->LogMessage(myself, "SSF:CBaseServer__WriteTempEntities maxentities after: %d", ev_max);
 		}
 	}
 
-	Assert( pGameClient->m_Sounds.Count() <= nMaxSounds ); // keep ev_max temp ent for next update
-
-	return msg.m_nNumSounds;
-}
-
-void Custom_CGameClient_WriteGameSounds(CGameClient *pGameClient, bf_write &buf, int nMaxSounds)
-{
-	if ( pGameClient->m_Sounds.Count() <= 0 )
-		return;
-
-	char data[NET_MAX_PAYLOAD];
-	SVC_Sounds msg;
-	msg.m_DataOut.StartWriting( data, sizeof(data) );
-	
-	msg.SetReliable( false );
-	int nSoundCount = Custom_CGameClient_FillSoundsMessage( pGameClient, msg, nMaxSounds );
-	msg.WriteToBuffer( buf );
-
-	if ( pGameClient->IsTracing() )
+	if (g_SvSSFLog->GetBool())
 	{
-		pGameClient->TraceNetworkData( buf, "Sounds [count=%d]", nSoundCount );
-	}
-}
-
-void Custom_CBaseClient_SendSnapshot(CBaseClient *pBaseClient, CClientFrame *pFrame)
-{
-	// never send the same snapshot twice
-	if ( pBaseClient->m_pLastSnapshot == pFrame->GetSnapshot() )
-	{
-		pBaseClient->m_NetChannel->Transmit();
-		return;
+		g_pSM->LogMessage(myself, "SSF:CBaseServer__WriteTempEntities maxentities: %d", ev_max);
 	}
 
-	// if we send a full snapshot (no delta-compression) before, wait until client
-	// received and acknowledge that update. don't spam client with full updates
-	if ( pBaseClient->m_nForceWaitForTick > 0 )
-	{
-		// just continue transmitting reliable data
-		pBaseClient->m_NetChannel->Transmit();	
-		return;
-	}
-
-	VPROF_BUDGET( "SendSnapshot", VPROF_BUDGETGROUP_OTHER_NETWORKING );
-	// tmZoneFiltered( TELEMETRY_LEVEL0, 50, TMZF_NONE, "%s", __FUNCTION__ );
-
-	bf_write msg( "CBaseClient::SendSnapshot", pBaseClient->m_SnapshotScratchBuffer, sizeof( pBaseClient->m_SnapshotScratchBuffer ) );
-
-	TRACE_PACKET( ( "SendSnapshot(%d)\n", pFrame->tick_count ) );
-
-	// now create client snapshot packet
-	CClientFrame * deltaFrame = pBaseClient->m_nDeltaTick < 0 ? NULL : pBaseClient->GetDeltaFrame( pBaseClient->m_nDeltaTick ); // NULL if delta_tick is not found
-	if ( !deltaFrame )
-	{
-		// We need to send a full update and reset the instanced baselines
-		pBaseClient->OnRequestFullUpdate();
-	}
-
-	if ( pBaseClient->IsTracing() )
-	{
-		pBaseClient->StartTrace( msg );
-	}
-
-	// send tick time
-	NET_Tick tickmsg( pFrame->tick_count, host_frametime_unbounded, host_frametime_stddeviation );
-
-	if ( !tickmsg.WriteToBuffer( msg ) )
-	{
-		pBaseClient->Disconnect( "ERROR! Couldnt write snapshot to buffer" );
-		return;
-	}
-
-	if ( pBaseClient->IsTracing() )
-	{
-		pBaseClient->TraceNetworkData( msg, "NET_Tick" );
-	}
-
-#ifndef SHARED_NET_STRING_TABLES
-	// in LocalNetworkBackdoor mode we updated the stringtables already in SV_ComputeClientPacks()
-	if ( !g_pLocalNetworkBackdoor )
-	{
-		// Update shared client/server string tables. Must be done before sending entities
-		pBaseClient->m_Server->m_StringTables->WriteUpdateMessage( pBaseClient, pBaseClient->GetMaxAckTickCount(), msg );
-	}
-#endif
-
-	int nDeltaStartBit = 0;
-	if ( pBaseClient->IsTracing() )
-	{
-		nDeltaStartBit = msg.GetNumBitsWritten();
-	}
-
-	// send entity update, delta compressed if deltaFrame != NULL
-	pBaseClient->m_Server->WriteDeltaEntities( pBaseClient, pFrame, deltaFrame, msg );
-
-	if ( pBaseClient->IsTracing() )
-	{
-		int nBits = msg.GetNumBitsWritten() - nDeltaStartBit;
-		pBaseClient->TraceNetworkMsg( nBits, "Total Delta" );
-	}
-
-	// send all unreliable temp entities between last and current frame
-	// send max 64 events in multi player, 255 in SP
-	int nMaxTempEnts = pBaseClient->m_Server->IsMultiplayer() ? g_sv_multiplayer_maxtempentities->GetInt() : 255;
-	pBaseClient->m_Server->WriteTempEntities( pBaseClient, pFrame->GetSnapshot(), pBaseClient->m_pLastSnapshot.GetObject(), msg, nMaxTempEnts );
-
-	if ( pBaseClient->IsTracing() )
-	{
-		pBaseClient->TraceNetworkData( msg, "Temp Entities" );
-	}
-
-	int nMaxSounds = pBaseClient->m_Server->IsMultiplayer() ? g_sv_multiplayer_maxsounds->GetInt() : 255;
-	Custom_CGameClient_WriteGameSounds( (CGameClient *)pBaseClient, msg, nMaxSounds );
-
-	// write message to packet and check for overflow
-	if ( msg.IsOverflowed() )
-	{
-		if ( !deltaFrame )
-		{
-			// if this is a reliable snapshot, drop the client
-			pBaseClient->Disconnect( "ERROR! Reliable snaphsot overflow." );
-			return;
-		}
-		else
-		{
-			// unreliable snapshots may be dropped
-			ConMsg ("WARNING: msg overflowed for %s\n", pBaseClient->GetClientName());
-			msg.Reset();
-		}
-	}
-
-	// remember this snapshot
-	pBaseClient->m_pLastSnapshot = pFrame->GetSnapshot();
-
-	// Don't send the datagram to fakeplayers unless sv_stressbots is on (which will make m_NetChannel non-null).
-	if ( pBaseClient->m_bFakePlayer && !pBaseClient->m_NetChannel )
-	{
-		pBaseClient->m_nDeltaTick = pFrame->tick_count;
-		pBaseClient->m_nStringTableAckTick = pBaseClient->m_nDeltaTick;
-		return;
-	}
-
-	bool bSendOK;
-
-	// is this is a full entity update (no delta) ?
-	if ( !deltaFrame )
-	{
-		VPROF_BUDGET( "SendSnapshot Transmit Full", VPROF_BUDGETGROUP_OTHER_NETWORKING );
-
-		// transmit snapshot as reliable data chunk
-		bSendOK = pBaseClient->m_NetChannel->SendData( msg );
-		bSendOK = bSendOK && pBaseClient->m_NetChannel->Transmit();
-
-		// remember this tickcount we send the reliable snapshot
-		// so we can continue sending other updates if this has been acknowledged
-		pBaseClient->m_nForceWaitForTick = pFrame->tick_count;
-	}
-	else
-	{
-		VPROF_BUDGET( "SendSnapshot Transmit Delta", VPROF_BUDGETGROUP_OTHER_NETWORKING );
-
-		// just send it as unreliable snapshot
-		bSendOK = pBaseClient->m_NetChannel->SendDatagram( &msg ) > 0;
-	}
-		
-	if ( !bSendOK )
-	{
-		pBaseClient->Disconnect( "ERROR! Couldn't send snapshot." );
-		return;
-	}
-}
-
-DETOUR_DECL_MEMBER1(Custom_CBaseClient_FillSoundsMessage, int, SVC_Sounds, &msg)
-{
-	CGameClient *pGameClient = (CGameClient *)this;
-
-	int nMaxSounds = pGameClient->m_Server->IsMultiplayer() ? g_sv_multiplayer_maxsounds->GetInt() : 255;
-	int nResult = Custom_CGameClient_FillSoundsMessage((CGameClient *)this, msg, nMaxSounds);
-	RETURN_META_VALUE(MRES_SUPERCEDE, nResult);
-}
-
-DETOUR_DECL_MEMBER1(CGameClient__WriteGameSounds, void, bf_write, &buf)
-{
-	CGameClient *pGameClient = (CGameClient *)this;
-
-	int nMaxSounds = pGameClient->m_Server->IsMultiplayer() ? g_sv_multiplayer_maxsounds->GetInt() : 255;
-	Custom_CGameClient_WriteGameSounds((CGameClient *)this, buf, nMaxSounds);
+	DETOUR_MEMBER_CALL(CBaseServer__WriteTempEntities)(client, pCurrentSnapshot, pLastSnapshot, buf, ev_max);
 }
 
 DETOUR_DECL_MEMBER1(CBaseClient__SendSnapshot, void, CClientFrame *, pFrame)
 {
 	CBaseClient *pBaseClient = (CBaseClient *)this;
 
-	Custom_CBaseClient_SendSnapshot(pBaseClient, pFrame);
-
-//	return DETOUR_MEMBER_CALL(CBaseClient__SendSnapshot)(pFrame);
+	DETOUR_MEMBER_CALL(CBaseClient__SendSnapshot)(pFrame);
 }
 
 bool SSF::SDK_OnMetamodLoad(ISmmAPI *ismm, char *error, size_t maxlen, bool late)
@@ -478,11 +103,6 @@ bool SSF::SDK_OnMetamodLoad(ISmmAPI *ismm, char *error, size_t maxlen, bool late
 	gpGlobals = ismm->GetCGlobals();
 
     ConVar_Register(0, this);
-
-	if (g_SvSSFLog->GetBool())
-	{
-		g_pSM->LogMessage(myself, "SSF:Inside SendSnapshot");
-	}
 
 	return true;
 }
@@ -509,6 +129,14 @@ bool SSF::SDK_OnLoad(char *error, size_t maxlen, bool late)
 	}
 	g_Detour_CBaseClient__SendSnapshot->EnableDetour();
 
+	g_Detour_CBaseServer__WriteTempEntities = DETOUR_CREATE_MEMBER(CBaseServer__WriteTempEntities, "CBaseServer__WriteTempEntities");
+	if(!g_Detour_CBaseServer__WriteTempEntities)
+	{
+		snprintf(error, maxlen, "Failed to detour CBaseServer__WriteTempEntities.\n");
+		return false;
+	}
+	g_Detour_CBaseServer__WriteTempEntities->EnableDetour();
+
 	AutoExecConfig(g_pCVar, true);
 
 	return true;
@@ -520,6 +148,12 @@ void SSF::SDK_OnUnload()
 	{
 		g_Detour_CBaseClient__SendSnapshot->Destroy();
 		g_Detour_CBaseClient__SendSnapshot = NULL;
+	}
+
+	if(g_Detour_CBaseServer__WriteTempEntities)
+	{
+		g_Detour_CBaseServer__WriteTempEntities->Destroy();
+		g_Detour_CBaseServer__WriteTempEntities = NULL;
 	}
 
 	gameconfs->CloseGameConfigFile(g_pGameConf);

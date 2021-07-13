@@ -15,6 +15,12 @@
 				"library"		"engine"
 				"linux"			"@_ZN11CBaseClient12SendSnapshotEP12CClientFrame"
 			}
+
+			"CBaseServer__WriteTempEntities"
+			{
+				"library"		"engine"
+				"linux"			"@_ZN11CBaseServer17WriteTempEntitiesEP11CBaseClientP14CFrameSnapshotS3_R8bf_writei"
+			}
 		}
 	}
 }
