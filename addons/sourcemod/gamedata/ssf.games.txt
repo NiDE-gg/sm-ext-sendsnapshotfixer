@@ -21,6 +21,18 @@
 				"library"		"engine"
 				"linux"			"@_ZN11CBaseServer17WriteTempEntitiesEP11CBaseClientP14CFrameSnapshotS3_R8bf_writei"
 			}
+
+			"CGameClient_FillSoundsMessage"
+			{
+				"library"		"engine"
+				"linux"			"@_ZN11CGameClient17FillSoundsMessageER10SVC_Sounds"
+			}
+
+			"CGameClient__WriteGameSounds"
+			{
+				"library"		"engine"
+				"linux"			"@_ZN11CGameClient15WriteGameSoundsER8bf_write"
+			}
 		}
 	}
 }
