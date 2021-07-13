@@ -31,6 +31,11 @@ CopyFiles('addons/sourcemod/gamedata', 'addons/sourcemod/gamedata',
   [ 'ssf.games.txt' ]
 )
 
+# AutoLoad
+CopyFiles('addons/sourcemod/extensions', 'addons/sourcemod/extensions',
+  [ 'sendsnapshotfixer.autoload' ]
+)
+
 # Copy binaries.
 for cxx_task in Extension.extensions:
   builder.AddCopy(cxx_task.binary, folder_map['addons/sourcemod/extensions'])
