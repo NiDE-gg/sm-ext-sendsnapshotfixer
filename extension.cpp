@@ -30,7 +30,6 @@
  */
 
 #include "extension.h"
-#include "extensionHelper.h"
 #include "CDetour/detours.h"
 #include <sourcehook.h>
 #include <iclient.h>
@@ -202,8 +201,8 @@ CDetour *g_Detour_CBaseServer__WriteTempEntities = NULL;
 // CDetour *g_Detour_CGameClient__FillSoundsMessage = NULL;
 // CDetour *g_Detour_CGameClient__WriteGameSounds = NULL;
 
-ConVar *g_SvSSFLog = CreateConVar("sv_ssf_log", "0", FCVAR_NOTIFY, "Log ssf debug print statements.");
-ConVar *g_sv_multiplayer_maxtempentities = CreateConVar("sv_multiplayer_maxtempentities", "64");
+ConVar g_SvSSFLog("sv_ssf_log", "0", FCVAR_NOTIFY, "Log ssf debug print statements.");
+ConVar g_sv_multiplayer_maxtempentities("sv_multiplayer_maxtempentities", "64");
 // ConVar *g_sv_multiplayer_maxsounds = CreateConVar("sv_multiplayer_sounds", "32");
 // ConVar *g_sv_sound_discardextraunreliable = CreateConVar( "sv_sound_discardextraunreliable", "1" );
 
@@ -212,7 +211,7 @@ ConVar *g_sv_multiplayer_maxtempentities = CreateConVar("sv_multiplayer_maxtempe
 // 	int nMaxSounds = pGameClient->GetServer()->IsMultiplayer() ? g_sv_multiplayer_maxsounds->GetInt() : 255;
 // 	int i, count = pGameClient->m_Sounds.Count();
 
-// 	if (g_SvSSFLog->GetBool())
+// 	if (g_SvSSFLog.GetBool())
 // 	{
 // 		g_pSM->LogMessage(myself, "SSF:CGameClient__FillSoundsMessage maxsounds before: %d, count: %d", nMaxSounds, pGameClient->m_Sounds.Count());
 // 	}
@@ -232,7 +231,7 @@ ConVar *g_sv_multiplayer_maxtempentities = CreateConVar("sv_multiplayer_maxtempe
 // 	msg.m_bReliableSound = false;
 // 	msg.SetReliable( false );
 
-// 	if (g_SvSSFLog->GetBool())
+// 	if (g_SvSSFLog.GetBool())
 // 	{
 // 		g_pSM->LogMessage(myself, "SSF:CGameClient__FillSoundsMessage getnumbitsleft: %d", msg.m_DataOut.GetNumBitsLeft());
 // 	}
@@ -270,7 +269,7 @@ ConVar *g_sv_multiplayer_maxtempentities = CreateConVar("sv_multiplayer_maxtempe
 // 		}
 // 	}
 
-// 	if (g_SvSSFLog->GetBool())
+// 	if (g_SvSSFLog.GetBool())
 // 	{
 // 		g_pSM->LogMessage(myself, "SSF:CGameClient__FillSoundsMessage maxsounds after: %d count: %d, NumSounds: %d", nMaxSounds, pGameClient->m_Sounds.Count(), msg.m_nNumSounds);
 // 	}
@@ -314,22 +313,22 @@ DETOUR_DECL_MEMBER5(CBaseServer__WriteTempEntities, void, CBaseClient *, client,
 {
 	if (!client->IsHLTV() && !client->IsReplay())
 	{
-		if (g_SvSSFLog->GetBool())
+		if (g_SvSSFLog.GetBool())
 		{
 			g_pSM->LogMessage(myself, "SSF:CBaseServer__WriteTempEntities maxentities before: %d", ev_max);
 		}
 
 		// send all unreliable temp entities between last and current frame
 		// send max 64 events in multi player, 255 in SP
-		ev_max = client->GetServer()->IsMultiplayer() ? g_sv_multiplayer_maxtempentities->GetInt() : 255;
+		ev_max = client->GetServer()->IsMultiplayer() ? g_sv_multiplayer_maxtempentities.GetInt() : 255;
 
-		if (g_SvSSFLog->GetBool())
+		if (g_SvSSFLog.GetBool())
 		{
 			g_pSM->LogMessage(myself, "SSF:CBaseServer__WriteTempEntities maxentities after: %d", ev_max);
 		}
 	}
 
-	if (g_SvSSFLog->GetBool())
+	if (g_SvSSFLog.GetBool())
 	{
 		g_pSM->LogMessage(myself, "SSF:CBaseServer__WriteTempEntities maxentities: %d", ev_max);
 	}
@@ -400,8 +399,6 @@ bool SSF::SDK_OnLoad(char *error, size_t maxlen, bool late)
 	// 	return false;
 	// }
 	// g_Detour_CGameClient__WriteGameSounds->EnableDetour();
-
-	AutoExecConfig(g_pCVar, true);
 
 	return true;
 }
