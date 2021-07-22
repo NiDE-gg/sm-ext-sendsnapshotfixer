@@ -75,13 +75,6 @@ DETOUR_DECL_MEMBER2(CFrameSnapshot__CreateEmptySnapshot, CFrameSnapshot *, int, 
 	
 	CFrameSnapshot* snap = DETOUR_MEMBER_CALL(CFrameSnapshot__CreateEmptySnapshot)(tickcount, maxEntities);
 
-	AUTO_LOCK_FM(m_FrameSnapshotsWriteMutex);
-
-	if (g_SvSSFLog.GetBool())
-	{
-		g_pSM->LogMessage(myself, "SSF:CFrameSnapshot__CreateEmptySnapshot locking 2");
-	}
-
 	return snap;
 }
 
