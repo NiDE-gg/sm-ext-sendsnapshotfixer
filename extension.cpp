@@ -62,16 +62,11 @@ CDetour *g_Detour_CFrameSnapshot__CreateEmptySnapshot = NULL;
 // Mutex for m_FrameSnapshots array
 CThreadFastMutex									m_FrameSnapshotsWriteMutex;
 
-ConVar *g_SvSSFLog = CreateConVar("sv_ssf_log", "0", FCVAR_NOTIFY, "Log ssf debug print statements.");
+// ConVar *g_SvSSFLog = CreateConVar("sv_ssf_log", "0", FCVAR_NOTIFY, "Log ssf debug print statements.");
 ConVar *g_sv_multiplayer_maxtempentities = CreateConVar("sv_multiplayer_maxtempentities", "64");
 
 DETOUR_DECL_MEMBER2(CFrameSnapshot__CreateEmptySnapshot, CFrameSnapshot *, int, tickcount, int, maxEntities )
 {
-	if (g_SvSSFLog->GetBool())
-	{
-		g_pSM->LogMessage(myself, "SSF:CFrameSnapshot__CreateEmptySnapshot locking 1");
-	}
-
 	AUTO_LOCK_FM(m_FrameSnapshotsWriteMutex);
 	
 	CFrameSnapshot* snap = DETOUR_MEMBER_CALL(CFrameSnapshot__CreateEmptySnapshot)(tickcount, maxEntities);
@@ -86,11 +81,6 @@ DETOUR_DECL_MEMBER2(CFrameSnapshot__CreateEmptySnapshot, CFrameSnapshot *, int, 
 
 DETOUR_DECL_MEMBER0(CFrameSnapshot__ReleaseReference, void)
 {
-	if (g_SvSSFLog->GetBool())
-	{
-		g_pSM->LogMessage(myself, "SSF:CFrameSnapshot__ReleaseReference locking");
-	}
-
 	AUTO_LOCK_FM(m_FrameSnapshotsWriteMutex);
 	
 	DETOUR_MEMBER_CALL(CFrameSnapshot__ReleaseReference)();
@@ -100,32 +90,12 @@ DETOUR_DECL_MEMBER5(CBaseServer__WriteTempEntities, void, CBaseClient *, client,
 {
 	if (!client->IsHLTV() && !client->IsReplay())
 	{
-		if (g_SvSSFLog->GetBool())
-		{
-			g_pSM->LogMessage(myself, "SSF:CBaseServer__WriteTempEntities maxentities before: %d", ev_max);
-		}
-
 		// send all unreliable temp entities between last and current frame
 		// send max 64 events in multi player, 255 in SP
 		ev_max = client->GetServer()->IsMultiplayer() ? g_sv_multiplayer_maxtempentities->GetInt() : 255;
-
-		if (g_SvSSFLog->GetBool())
-		{
-			g_pSM->LogMessage(myself, "SSF:CBaseServer__WriteTempEntities maxentities after: %d", ev_max);
-		}
-	}
-
-	if (g_SvSSFLog->GetBool())
-	{
-		g_pSM->LogMessage(myself, "SSF:CBaseServer__WriteTempEntities locking");
 	}
 
 	AUTO_LOCK_FM(m_FrameSnapshotsWriteMutex);
-
-	if (g_SvSSFLog->GetBool())
-	{
-		g_pSM->LogMessage(myself, "SSF:CBaseServer__WriteTempEntities maxentities: %d", ev_max);
-	}
 
 	DETOUR_MEMBER_CALL(CBaseServer__WriteTempEntities)(client, pCurrentSnapshot, pLastSnapshot, buf, ev_max);
 }
