@@ -38,6 +38,14 @@
  */
 
 #include "smsdk_ext.h"
+#include <igameevents.h>
+#include <iclient.h>
+#include <sourcehook.h>
+#include <iserver.h>
+#include <iplayerinfo.h>
+#include <soundinfo.h>
+#include <threadtools.h>
+#include "framesnapshot.h"
 
 /**
  * @brief Sample implementation of the SDK Extension.
@@ -119,5 +127,36 @@ public:
 public:  // IConCommandBaseAccessor
 	virtual bool RegisterConCommandBase(ConCommandBase *pVar);
 };
+
+class CClientFrame;
+
+class CBaseClient : public IGameEventListener2, public IClient
+{
+
+};
+
+// #ifndef WIN32
+// typedef void (*Func_CFrameSnapshot__m_FrameSnapshots__AddToTail)( const CFrameSnapshot * src );
+// #else
+// typedef void (__fastcall *Func_CFrameSnapshot__m_FrameSnapshots__AddToTail)( void *, const CFrameSnapshot * src );
+// #endif
+
+typedef CInterlockedInt (*Func_CFrameSnapshot__m_FrameSnapshots__AddToTail)( const CFrameSnapshot * src );
+extern Func_CFrameSnapshot__m_FrameSnapshots__AddToTail g_Func_CFrameSnapshot__m_FrameSnapshots__AddToTail;
+
+typedef void (*Func_CFrameSnapshot__m_FrameSnapshots__Remove)( CInterlockedInt src );
+extern Func_CFrameSnapshot__m_FrameSnapshots__Remove g_Func_CFrameSnapshot__m_FrameSnapshots__Remove;
+
+typedef void (*Func_CFrameSnapshotManager__g_FrameSnapshotManager__RemoveEntityReference)( PackedEntityHandle_t handle );
+extern Func_CFrameSnapshotManager__g_FrameSnapshotManager__RemoveEntityReference g_Func_CFrameSnapshotManager__g_FrameSnapshotManager__RemoveEntityReference;
+
+// typedef void (*Func_CFrameSnapshotManager__g_FrameSnapshotManager__DeleteFrameSnapshot)( CFrameSnapshot * pSnapshot );
+// extern Func_CFrameSnapshotManager__g_FrameSnapshotManager__DeleteFrameSnapshot g_Func_CFrameSnapshotManager__g_FrameSnapshotManager__DeleteFrameSnapshot;
+
+typedef CFrameSnapshot* (*Func_CFrameSnapshotManager__g_FrameSnapshotManager__NextSnapshot)( const CFrameSnapshot *pSnapshot );
+extern Func_CFrameSnapshotManager__g_FrameSnapshotManager__NextSnapshot g_Func_CFrameSnapshotManager__g_FrameSnapshotManager__NextSnapshot;
+
+// Mutex for m_FrameSnapshots array
+extern CThreadFastMutex									m_FrameSnapshotsWriteMutex;
 
 #endif // _INCLUDE_SOURCEMOD_EXTENSION_PROPER_H_

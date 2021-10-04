@@ -32,21 +32,6 @@
 #include "extension.h"
 #include "extensionHelper.h"
 #include "CDetour/detours.h"
-#include <sourcehook.h>
-#include <iclient.h>
-#include <iserver.h>
-#include <igameevents.h>
-#include <iplayerinfo.h>
-#include <soundinfo.h>
-#include <threadtools.h>
-
-class CFrameSnapshot;
-class CClientFrame;
-
-class CBaseClient : public IGameEventListener2, public IClient
-{
-
-};
 
 SSF g_SSF;		/**< Global singleton for extension's main interface */
 
@@ -56,34 +41,61 @@ IGameConfig *g_pGameConf = NULL;
 CGlobalVars *gpGlobals = NULL;
 
 CDetour *g_Detour_CBaseServer__WriteTempEntities = NULL;
-CDetour *g_Detour_CFrameSnapshot__ReleaseReference = NULL;
-CDetour *g_Detour_CFrameSnapshot__CreateEmptySnapshot = NULL;
+CDetour *g_Detour_CFrameSnapshotManager__CreateEmptySnapshot = NULL;
 
-// Mutex for m_FrameSnapshots array
-CThreadFastMutex									m_FrameSnapshotsWriteMutex;
+Func_CFrameSnapshot__m_FrameSnapshots__AddToTail g_Func_CFrameSnapshot__m_FrameSnapshots__AddToTail;
+Func_CFrameSnapshot__m_FrameSnapshots__Remove g_Func_CFrameSnapshot__m_FrameSnapshots__Remove;
+// Func_CFrameSnapshotManager__g_FrameSnapshotManager__DeleteFrameSnapshot g_Func_CFrameSnapshotManager__g_FrameSnapshotManager__DeleteFrameSnapshot;
+Func_CFrameSnapshotManager__g_FrameSnapshotManager__NextSnapshot g_Func_CFrameSnapshotManager__g_FrameSnapshotManager__NextSnapshot;
+Func_CFrameSnapshotManager__g_FrameSnapshotManager__RemoveEntityReference g_Func_CFrameSnapshotManager__g_FrameSnapshotManager__RemoveEntityReference;
+
+CThreadFastMutex		m_FrameSnapshotsWriteMutex;
 
 // ConVar *g_SvSSFLog = CreateConVar("sv_ssf_log", "0", FCVAR_NOTIFY, "Log ssf debug print statements.");
 ConVar *g_sv_multiplayer_maxtempentities = CreateConVar("sv_multiplayer_maxtempentities", "64");
 
-DETOUR_DECL_MEMBER2(CFrameSnapshot__CreateEmptySnapshot, CFrameSnapshot *, int, tickcount, int, maxEntities )
+DETOUR_DECL_MEMBER2(CFrameSnapshotManager__CreateEmptySnapshot, CFrameSnapshot *, int, tickcount, int, maxEntities )
 {
-	AUTO_LOCK_FM(m_FrameSnapshotsWriteMutex);
+	// AUTO_LOCK_FM(m_FrameSnapshotsWriteMutex);
 	
-	CFrameSnapshot* snap = DETOUR_MEMBER_CALL(CFrameSnapshot__CreateEmptySnapshot)(tickcount, maxEntities);
+	// CFrameSnapshot* snap = DETOUR_MEMBER_CALL(CFrameSnapshotManager__CreateEmptySnapshot)(tickcount, maxEntities);
+
+	CFrameSnapshot *snap = NULL;
+	{
+//		AUTO_LOCK_FM( m_FrameSnapshotsWriteMutex );
+		snap = new CFrameSnapshot;
+		snap->AddReference();
+	}
+
+	snap->m_nTickCount = tickcount;
+	snap->m_nNumEntities = maxEntities;
+	snap->m_nValidEntities = 0;
+	snap->m_pValidEntities = NULL;
+	snap->m_pHLTVEntityData = NULL;
+	snap->m_pReplayEntityData = NULL;
+	snap->m_pEntities = new CFrameSnapshotEntry[maxEntities];
+
+	CFrameSnapshotEntry *entry = snap->m_pEntities;
+	
+	// clear entries
+	for ( int i=0; i < maxEntities; i++)
+	{
+		entry->m_pClass = NULL;
+		entry->m_nSerialNumber = -1;
+		entry->m_pPackedData = INVALID_PACKED_ENTITY_HANDLE;
+		entry++;
+	}
+
+	{
+//		AUTO_LOCK_FM( m_FrameSnapshotsWriteMutex );
+		g_pSM->LogMessage(myself, "Before g_Func_CFrameSnapshot__m_FrameSnapshots__AddToTail");
+
+		snap->m_ListIndex = g_Func_CFrameSnapshot__m_FrameSnapshots__AddToTail( snap );
+
+		g_pSM->LogMessage(myself, "After g_Func_CFrameSnapshot__m_FrameSnapshots__AddToTail");
+	}
 
 	return snap;
-}
-
-// Keep list building thread-safe
-// This lock was moved to to fix bug https://bugbait.valvesoftware.com/show_bug.cgi?id=53403
-// Crash in CFrameSnapshotManager::GetPackedEntity where a CBaseClient's m_pBaseline snapshot could be removed the CReferencedSnapshotList destructor 
-// for another client that is in WriteTempEntities
-
-DETOUR_DECL_MEMBER0(CFrameSnapshot__ReleaseReference, void)
-{
-	AUTO_LOCK_FM(m_FrameSnapshotsWriteMutex);
-	
-	DETOUR_MEMBER_CALL(CFrameSnapshot__ReleaseReference)();
 }
 
 DETOUR_DECL_MEMBER5(CBaseServer__WriteTempEntities, void, CBaseClient *, client, CFrameSnapshot *, pCurrentSnapshot, CFrameSnapshot *, pLastSnapshot, bf_write &, buf, int, ev_max)
@@ -133,21 +145,45 @@ bool SSF::SDK_OnLoad(char *error, size_t maxlen, bool late)
 	}
 	g_Detour_CBaseServer__WriteTempEntities->EnableDetour();
 
-	g_Detour_CFrameSnapshot__ReleaseReference = DETOUR_CREATE_MEMBER(CFrameSnapshot__ReleaseReference, "CFrameSnapshot__ReleaseReference");
-	if(!g_Detour_CFrameSnapshot__ReleaseReference)
+	g_Detour_CFrameSnapshotManager__CreateEmptySnapshot = DETOUR_CREATE_MEMBER(CFrameSnapshotManager__CreateEmptySnapshot, "CFrameSnapshotManager__CreateEmptySnapshot");
+	if(!g_Detour_CFrameSnapshotManager__CreateEmptySnapshot)
 	{
-		snprintf(error, maxlen, "Failed to detour CFrameSnapshot__ReleaseReference.\n");
+		snprintf(error, maxlen, "Failed to detour CFrameSnapshotManager__CreateEmptySnapshot.\n");
 		return false;
 	}
-	g_Detour_CFrameSnapshot__ReleaseReference->EnableDetour();
+	g_Detour_CFrameSnapshotManager__CreateEmptySnapshot->EnableDetour();
 
-	g_Detour_CFrameSnapshot__CreateEmptySnapshot = DETOUR_CREATE_MEMBER(CFrameSnapshot__CreateEmptySnapshot, "CFrameSnapshot__CreateEmptySnapshot");
-	if(!g_Detour_CFrameSnapshot__CreateEmptySnapshot)
+	void *address = NULL;
+	if (!g_pGameConf->GetMemSig("CFrameSnapshot__m_FrameSnapshots__AddToTail", &address))
 	{
-		snprintf(error, maxlen, "Failed to detour CFrameSnapshot__CreateEmptySnapshot.\n");
+		snprintf(error, maxlen, "Failed to find function CFrameSnapshot__m_FrameSnapshots__AddToTail.\n");
 		return false;
 	}
-	g_Detour_CFrameSnapshot__CreateEmptySnapshot->EnableDetour();
+	Func_CFrameSnapshot__m_FrameSnapshots__AddToTail g_Func_CFrameSnapshot__m_FrameSnapshots__AddToTail = (Func_CFrameSnapshot__m_FrameSnapshots__AddToTail)address; // Pointer to the function scanned from memory
+
+	address = NULL;
+	if (!g_pGameConf->GetMemSig("CFrameSnapshot__m_FrameSnapshots__Remove", &address))
+	{
+		snprintf(error, maxlen, "Failed to find function CFrameSnapshot__m_FrameSnapshots__Remove.\n");
+		return false;
+	}
+	Func_CFrameSnapshot__m_FrameSnapshots__Remove g_Func_CFrameSnapshot__m_FrameSnapshots__Remove = (Func_CFrameSnapshot__m_FrameSnapshots__Remove)address; // Pointer to the function scanned from memory
+
+	address = NULL;
+	if (!g_pGameConf->GetMemSig("CFrameSnapshotManager__g_FrameSnapshotManager__NextSnapshot", &address))
+	{
+		snprintf(error, maxlen, "Failed to find function CFrameSnapshotManager__g_FrameSnapshotManager__NextSnapshot.\n");
+		return false;
+	}
+	Func_CFrameSnapshotManager__g_FrameSnapshotManager__NextSnapshot g_Func_CFrameSnapshotManager__g_FrameSnapshotManager__NextSnapshot = (Func_CFrameSnapshotManager__g_FrameSnapshotManager__NextSnapshot)address; // Pointer to the function scanned from memory
+
+	// address = NULL;
+	// if (!g_pGameConf->GetMemSig("CFrameSnapshotManager__g_FrameSnapshotManager__DeleteFrameSnapshot", &address))
+	// {
+	// 	snprintf(error, maxlen, "Failed to find function CFrameSnapshotManager__g_FrameSnapshotManager__DeleteFrameSnapshot.\n");
+	// 	return false;
+	// }
+	// Func_CFrameSnapshotManager__g_FrameSnapshotManager__DeleteFrameSnapshot g_Func_CFrameSnapshotManager__g_FrameSnapshotManager__DeleteFrameSnapshot = (Func_CFrameSnapshotManager__g_FrameSnapshotManager__DeleteFrameSnapshot)address; // Pointer to the function scanned from memory
 
 	AutoExecConfig(g_pCVar, true);
 
@@ -162,16 +198,10 @@ void SSF::SDK_OnUnload()
 		g_Detour_CBaseServer__WriteTempEntities = NULL;
 	}
 
-	if (g_Detour_CFrameSnapshot__ReleaseReference)
+	if (g_Detour_CFrameSnapshotManager__CreateEmptySnapshot)
 	{
-		g_Detour_CFrameSnapshot__ReleaseReference->Destroy();
-		g_Detour_CFrameSnapshot__ReleaseReference = NULL;
-	}
-
-	if (g_Detour_CFrameSnapshot__CreateEmptySnapshot)
-	{
-		g_Detour_CFrameSnapshot__CreateEmptySnapshot->Destroy();
-		g_Detour_CFrameSnapshot__CreateEmptySnapshot = NULL;
+		g_Detour_CFrameSnapshotManager__CreateEmptySnapshot->Destroy();
+		g_Detour_CFrameSnapshotManager__CreateEmptySnapshot = NULL;
 	}
 
 	gameconfs->CloseGameConfigFile(g_pGameConf);

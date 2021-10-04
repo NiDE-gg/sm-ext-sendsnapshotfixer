@@ -16,16 +16,40 @@
 				"linux"			"@_ZN11CBaseServer17WriteTempEntitiesEP11CBaseClientP14CFrameSnapshotS3_R8bf_writei"
 			}
 
-			"CFrameSnapshot__ReleaseReference"
-			{
-				"library"		"engine"
-				"linux"			"@_ZN14CFrameSnapshot16ReleaseReferenceEv"
-			}
-
-			"CFrameSnapshot__CreateEmptySnapshot"
+			"CFrameSnapshotManager__CreateEmptySnapshot"
 			{
 				"library"		"engine"
 				"linux"			"@_ZN21CFrameSnapshotManager19CreateEmptySnapshotEii"
+			}
+
+			"CFrameSnapshot__m_FrameSnapshots__AddToTail"
+			{
+				"library"		"engine"
+				"linux"			"@_ZN14CUtlLinkedListIP14CFrameSnapshottLb0Et10CUtlMemoryI19UtlLinkedListElem_tIS1_tEtEE12InsertBeforeEtRKS1_"
+			}
+			
+			"CFrameSnapshot__m_FrameSnapshots__Remove"
+			{
+				"library"		"engine"
+				"linux"			"@_ZN14CUtlLinkedListIP14CFrameSnapshottLb0Et10CUtlMemoryI19UtlLinkedListElem_tIS1_tEtEE6UnlinkEt"
+			}
+
+			"CFrameSnapshotManager__g_FrameSnapshotManager__DeleteFrameSnapshot"
+			{
+				"library"		"engine"
+				"linux"			"@_ZN21CFrameSnapshotManager19DeleteFrameSnapshotEP14CFrameSnapshot"
+			}
+
+			"CFrameSnapshotManager__g_FrameSnapshotManager__RemoveEntityReference"
+			{
+				"library"		"engine"
+				"linux"			"@_ZN21CFrameSnapshotManager21RemoveEntityReferenceEi"
+			}
+
+			"CFrameSnapshotManager__g_FrameSnapshotManager__NextSnapshot"
+			{
+				"library"		"engine"
+				"linux"			"@_ZN21CFrameSnapshotManager12NextSnapshotEPK14CFrameSnapshot"
 			}
 		}
 	}
