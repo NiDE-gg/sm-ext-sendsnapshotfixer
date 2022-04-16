@@ -27,6 +27,11 @@
 				"library"		"engine"
 				"linux"			"@_ZN21CFrameSnapshotManager19CreateEmptySnapshotEii"
 			}
+			"SV_ComputeClientPacks"
+			{
+				"library"		"engine"
+				"linux"			""
+			}
 		}
 	}
 }

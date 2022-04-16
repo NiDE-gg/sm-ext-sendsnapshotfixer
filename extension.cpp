@@ -58,12 +58,19 @@ CGlobalVars *gpGlobals = NULL;
 CDetour *g_Detour_CBaseServer__WriteTempEntities = NULL;
 CDetour *g_Detour_CFrameSnapshot__ReleaseReference = NULL;
 CDetour *g_Detour_CFrameSnapshot__CreateEmptySnapshot = NULL;
+CDetour *g_Detour_SV_ComputeClientPacks = NULL;
 
 // Mutex for m_FrameSnapshots array
 CThreadFastMutex									m_FrameSnapshotsWriteMutex;
 
 // ConVar *g_SvSSFLog = CreateConVar("sv_ssf_log", "0", FCVAR_NOTIFY, "Log ssf debug print statements.");
 ConVar *g_sv_multiplayer_maxtempentities = CreateConVar("sv_multiplayer_maxtempentities", "64");
+ConVar *g_sv_parallel_computeclientpacks = CreateConVar("sv_parallel_computeclientpacks", "0");
+
+DETOUR_DECL_STATIC3(SV_ComputeClientPacks, void, int, clientCount, CGameClient **, clients, CFrameSnapshot*, snapshot )
+{
+	return DETOUR_STATIC_CALL(SV_ComputeClientPacks)(clientCount, clients, snapshot);
+}
 
 DETOUR_DECL_MEMBER2(CFrameSnapshot__CreateEmptySnapshot, CFrameSnapshot *, int, tickcount, int, maxEntities )
 {
@@ -148,6 +155,14 @@ bool SSF::SDK_OnLoad(char *error, size_t maxlen, bool late)
 		return false;
 	}
 	g_Detour_CFrameSnapshot__CreateEmptySnapshot->EnableDetour();
+
+	g_Detour_SV_ComputeClientPacks = DETOUR_CREATE_STATIC(SV_ComputeClientPacks, "SV_ComputeClientPacks");
+	if (g_Detour_SV_ComputeClientPacks == NULL)
+	{
+		snprintf(error, maxlen, "Failed to detour SV_ComputeClientPacks.\n");
+		return false;
+	}
+	g_Detour_SV_ComputeClientPacks->EnableDetour();
 
 	AutoExecConfig(g_pCVar, true);
 
